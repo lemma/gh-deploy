@@ -1,0 +1,33 @@
+#!/bin/bash -e
+
+if [[ -z "$GITHUB_OAUTH_TOKEN" ]] ; then
+  cat <<-WARN >&2
+Error, unable to locate oauth token.
+
+Please set the GITHUB_OAUTH_TOKEN environment variable.
+WARN
+
+  exit 1
+fi
+
+if [[ -z "$(which curl)" ]] ; then
+  cat <<-WARN >&2
+Error, unable to locate the curl command.
+WARN
+
+  exit 1
+fi
+
+sha=${1:-$(git rev-parse --short HEAD)}
+
+repo="$(cat .git/config \
+ | awk '$0 ~ /https:\/\/github.com\/(.+)/ { print $3;exit }' \
+ | sed 's|https://github.com/\(.*\)\(\.git\)\{0,1\}|\1|g')"
+
+flags=(-X POST)
+flags+=(-H "Authorization: token ${GITHUB_OAUTH_TOKEN}")
+flags+=(-H "Accept: application/vnd.github.cannonball-preview+json")
+flags+=(-H "Content-Type: application/json")
+flags+=(-d "{\"ref\": \""${sha}"\"}")
+
+curl "${flags[@]}" https://api.github.com/repos/${repo}/deployments
