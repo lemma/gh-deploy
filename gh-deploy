@@ -18,16 +18,72 @@ WARN
   exit 1
 fi
 
-sha=${1:-$(git rev-parse --short HEAD)}
+args=()
+while [[ -n "$1" ]] ; do
+  case "$1" in
+    (-a | --auto-merge ) automerge=true;;
+    (-c | --required-contexts ) required_contexts=$2; shift;;
+    (-d | --description ) description=$2; shift;;
+    (-e | --environment ) environment=$2; shift;;
+    (-o | --owner ) owner=$2; shift;;
+    (-p | --payload ) payload=$2; shift;;
+    (-r | --repo ) repo=$2; shift;;
+    (-t | --task ) task=$2; shift;;
+    (-v | --verbose ) verbose=true;;
+    (-* ) echo "Error, unrecognized flag $1" 1>&2; exit 1;;
+    ( * ) args+=($1);;
+  esac
+  shift
+done
 
-repo="$(cat .git/config \
- | awk '$0 ~ /https:\/\/github.com\/(.+)/ { print $3;exit }' \
- | sed 's|https://github.com/\(.*\)\(\.git\)\{0,1\}|\1|g')"
+ref=${args[0]:-$(git rev-parse --short HEAD)}
+
+if [[ -z "$owner" ]] ; then
+  owner="$(cat .git/config \
+   | awk '$0 ~ /https:\/\/github.com\/(.+)/ { split($3,a,/\.|\//); print a[5];exit }')"
+fi
+
+if [[ -z "$repo" ]] ; then
+  repo="$(cat .git/config \
+   | awk '$0 ~ /https:\/\/github.com\/(.+)/ { split($3,a,/\.|\//); print a[6];exit }')"
+fi
+
+json="{\"ref\": \"${ref}\""
+
+if [[ -n "$task" ]] ; then
+  json+=", \"task\": \"${task}\""
+fi
+
+if [[ -n "$automerge" ]] ; then
+  json+=", \"auto_merge\": true"
+fi
+
+if [[ -n "$required_contexts" ]] ; then
+  json+=", \"required_contexts\": [\"${required_contexts/,/\",\"}\"]"
+fi
+
+if [[ -n "$payload" ]] ; then
+  json+=", \"payload\": \"${payload}\""
+fi
+
+if [[ -n "$environment" ]] ; then
+  json+=", \"environment\": \"${environment}\""
+fi
+
+if [[ -n "$description" ]] ; then
+  json+=", \"description\": \"${description}\""
+fi
+
+json+="}"
 
 flags=(-X POST)
 flags+=(-H "Authorization: token ${GITHUB_OAUTH_TOKEN}")
 flags+=(-H "Accept: application/vnd.github.cannonball-preview+json")
 flags+=(-H "Content-Type: application/json")
-flags+=(-d "{\"ref\": \""${sha}"\"}")
+flags+=(-d "${json}")
 
-curl "${flags[@]}" https://api.github.com/repos/${repo}/deployments
+if [[ -n "$verbose" ]] ; then
+  flags+=(-v)
+fi
+
+curl "${flags[@]}" https://api.github.com/repos/${owner}/${repo}/deployments
