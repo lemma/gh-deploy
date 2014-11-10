@@ -1,4 +1,27 @@
 #!/bin/bash -e
+#
+#/gh-deploy [REF] [[FLAGS]]
+#/
+#/  Create a GitHub Deployment via the API.
+#/
+#/  FLAGS:
+#/
+#/    -a,--auto-merge          Auto-merge the default branch into the requested ref if it is behind the default branch
+#/    -c,--required-contexts   A comma seperated list of status contexts verified against commit status checks
+#/    -d,--description         Short description
+#/    -e,--environment         Name for the target deployment environment
+#/    -o,--owner               Owner name
+#/    -p,--payload             JSON payload with extra information about the deployment
+#/    -r,--repo                Repo name
+#/    -t,--task                The named task to execute
+#/    -v,--verbose             Verbose output
+#/    -h,--help                Show this usage
+#/
+
+
+function usage() {
+  awk '/^#\// { print $0 }' $0 | cut -c 3-
+}
 
 if [[ -z "$GITHUB_OAUTH_TOKEN" ]] ; then
   cat <<-WARN >&2
@@ -25,12 +48,13 @@ while [[ -n "$1" ]] ; do
     (-c | --required-contexts ) required_contexts=$2; shift;;
     (-d | --description ) description=$2; shift;;
     (-e | --environment ) environment=$2; shift;;
+    (-h | --help ) usage; exit 0;;
     (-o | --owner ) owner=$2; shift;;
     (-p | --payload ) payload=$2; shift;;
     (-r | --repo ) repo=$2; shift;;
     (-t | --task ) task=$2; shift;;
     (-v | --verbose ) verbose=true;;
-    (-* ) echo "Error, unrecognized flag $1" 1>&2; exit 1;;
+    (-* ) echo "Error, unrecognized flag $1" 1>&2; echo; usage; exit 1;;
     ( * ) args+=($1);;
   esac
   shift
